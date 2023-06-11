@@ -1,6 +1,11 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import {Image, StyleSheet, Text, View} from 'react-native';
-import {StatusBar} from "expo-status-bar";
+import {StatusBar} from 'expo-status-bar';
+import * as Location from 'expo-location';
+import axios from "axios";
+import * as String from "../util/stringUtils.js";
+
+const apiKey = '67c2a48e99fca1699b5e59d8b725c8df';
 
 export const CWeather = () => {
 
@@ -16,14 +21,23 @@ export const CWeather = () => {
 
   return (
     <View style={styles.weather}>
-      <CWeatherCurrent weather="Sunny" temp="28°" />
+      <CWeatherCurrent />
 
       <StatusBar style="auto" />
     </View>
   );
 };
 
-const CWeatherCurrent = ({weather, temp}) => {
+function getIcon(weather) {
+  switch (weather.toLowerCase()) {
+    case 'sunny':
+      return require('../assets/weather/sunny.png');
+    default:
+      break;
+  }
+}
+
+const CWeatherCurrent = () => {
 
   const styles = StyleSheet.create({
     wrapper: {
@@ -65,16 +79,53 @@ const CWeatherCurrent = ({weather, temp}) => {
     }
   });
 
-  return (
-      <View style={styles.wrapper}>
-        <Text style={styles.day}>Today</Text>
-        <View style={styles.body}>
-          <Text style={[styles.temp, styles.whiteText]}>{ temp }</Text>
-          <View style={styles.bodyWrapper}>
-            <Image source={require('../assets/weather/sunny.png')} style={styles.image}></Image>
-            <Text style={styles.whiteText}>{ weather }</Text>
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    const askLocation = async () => {
+
+      let lon = null,
+          lat = null;
+
+      await Location.requestForegroundPermissionsAsync();
+      await Location.getCurrentPositionAsync()
+          .then(location => {
+            lon = location.coords.longitude;
+            lat = location.coords.latitude;
+          })
+
+      return {lon, lat};
+    };
+
+    askLocation()
+        .then(async ({lon, lat}) => {
+          try {
+            const response = await axios.get(
+                `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`
+            );
+
+            console.log(response.data);
+
+            const { name, main, weather } = response.data;
+            setData({name, main, weather});
+          } catch (error) {
+            console.log(error);
+          }
+        });
+  }, []);
+
+  if (data) {
+    return (
+        <View style={styles.wrapper}>
+          <Text style={styles.day}>Today</Text>
+          <View style={styles.body}>
+            <Text style={[styles.temp, styles.whiteText]}>{ `${Math.round(data.main.temp)}°` }</Text>
+            <View style={styles.bodyWrapper}>
+              <Image source={getIcon('sunny')} style={styles.image}></Image>
+              <Text style={styles.whiteText}>{ String.capitalizeFirstLetter(data.weather[0].description) }</Text>
+            </View>
           </View>
         </View>
-      </View>
-  );
+    );
+  }
 };
